@@ -80,6 +80,18 @@ def ifft_2d(image):
     ifft_result = np.array([ifft_1d(ifft_rows[:, col]) for col in range(cols)]).T  # Column-wise Inverse FFT
     return ifft_result
 
+# Apply a low-pass filter
+def apply_low_pass_filter(magnitude, cutoff_frequency):
+    print(f"Applying low-pass filter with cutoff frequency: {cutoff_frequency}")
+    rows, cols = magnitude.shape
+    crow, ccol = rows // 2, cols // 2
+    mask = np.zeros_like(magnitude)
+    for i in range(rows):
+        for j in range(cols):
+            if np.sqrt((i - crow) ** 2 + (j - ccol) ** 2) <= cutoff_frequency:
+                mask[i, j] = 1
+    return magnitude * mask
+
 # Perform FFT and return magnitude and phase
 def perform_fft(image):
     padded_image = pad_to_power_of_two(image)
@@ -118,7 +130,7 @@ def save_and_display_results(image, result_list, mode):
 
 # Compare runtime of Naive DFT and FFT
 def plot_runtime_graphs():
-    sizes = [32, 64, 128, 256, 512]
+    sizes = [32, 64, 128, 256]
     dft_times = []
     fft_times = []
 
