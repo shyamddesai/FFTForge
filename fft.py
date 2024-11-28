@@ -5,6 +5,7 @@ from PIL import Image
 import argparse
 import os
 import time
+from scipy.sparse import csr_matrix, save_npz
 
 # Load an image and convert it to grayscale
 def load_image(image_path):
@@ -128,6 +129,75 @@ def save_and_display_results(image, result_list, mode):
     plt.tight_layout()
     plt.show()
 
+# Compress the FFT magnitude by retaining a specified fraction of coefficients
+def compress_magnitude(magnitude, compression_level):
+    print(f"Compressing with level: {compression_level * 100}%")
+    threshold = np.percentile(magnitude, 100 * compression_level)  # Determine threshold
+    compressed_magnitude = magnitude.copy()
+    compressed_magnitude[compressed_magnitude < threshold] = 0  # Zero out smaller coefficients
+    return compressed_magnitude
+
+# Save the compressed images and their sparse matrices for various compression levels
+def save_and_display_compression_results(image, magnitude, phase, original_shape, results_dir):
+    compression_levels = [0.45, 0.96, 0.97, 0.99, 0.999]  # Compression levels to apply
+    os.makedirs(results_dir, exist_ok=True)
+
+    plt.figure(figsize=(15, 10))  # Fixed figure size for clarity
+
+    # Save and display original image (0% compression)
+    sparse_matrix = csr_matrix(magnitude)
+    original_file_path = os.path.join(results_dir, "sparse_matrix_original.npz")
+    save_npz(original_file_path, sparse_matrix)
+    original_size = os.path.getsize(original_file_path)
+    original_size_str = f"{original_size:,}"  # Add commas to size
+
+    # Save original image
+    original_image_path = os.path.join(results_dir, "original_image.png")
+    plt.imsave(original_image_path, image, cmap="gray")
+    print(f"Original image saved: {original_image_path}")
+    print(f"Original matrix size: {original_size_str} bytes")
+
+    # Plot original image
+    plt.subplot(2, 3, 1)  # 2 rows, 3 columns for 6 images (original + 5 compression levels)
+    plt.imshow(image, cmap="gray")
+    plt.title(f"Original\nMatrix Size: {original_size_str} bytes")
+    plt.xticks([])
+    plt.yticks([])
+
+    # Iterate over compression levels
+    for idx, level in enumerate(compression_levels, start=2):
+        # Compress the magnitude
+        compressed_magnitude = compress_magnitude(magnitude, level)
+
+        # Save the sparse matrix
+        sparse_matrix = csr_matrix(compressed_magnitude)
+        sparse_file_path = os.path.join(results_dir, f"sparse_matrix_{int(level * 100)}.npz")
+        save_npz(sparse_file_path, sparse_matrix)
+        compressed_size = os.path.getsize(sparse_file_path)
+        compressed_size_str = f"{compressed_size:,}"  # Add commas to size
+
+        # Reconstruct the image using the compressed magnitude
+        reconstructed_image = perform_inverse_fft(compressed_magnitude, phase, original_shape)
+
+        # Save the reconstructed image
+        compressed_image_path = os.path.join(results_dir, f"compressed_image_{int(level * 100)}.png")
+        plt.imsave(compressed_image_path, reconstructed_image, cmap="gray")
+        print(f"Compressed image saved: {compressed_image_path}")
+
+        # Plot the reconstructed image
+        plt.subplot(2, 3, idx)
+        plt.imshow(reconstructed_image, cmap="gray")
+        plt.title(f"Compressed {level * 100}%\nMatrix Size: {compressed_size_str} bytes")
+        plt.xticks([])
+        plt.yticks([])
+
+    # Adjust layout and save the final plot
+    plt.tight_layout(rect=[0, 0, 1, 0.95])  # Ensure proper spacing
+    plot_path = os.path.join(results_dir, "compression_results.png")
+    plt.savefig(plot_path)
+    print(f"Compression results plot saved: {plot_path}")
+    plt.show()
+    
 # Compare runtime of Naive DFT and FFT
 def plot_runtime_graphs():
     sizes = [32, 64, 128, 256]
@@ -159,7 +229,8 @@ def plot_runtime_graphs():
     plt.savefig("results/mode_4/runtime_comparison.png")
     plt.show()
 
-# Main function
+# ====================================================================================================
+
 def main():
     parser = argparse.ArgumentParser(description="Perform FFT-based tasks on an image.")
     parser.add_argument("-m", "--mode", type=int, default=1, help="Mode of operation: 1 (Fast), 2 (Denoise), 3 (Compress), 4 (Runtime)")
@@ -194,15 +265,7 @@ def main():
         save_and_display_results(image, result_list, mode=2)
 
     elif args.mode == 3:
-        compression_levels = [0.5, 0.75, 0.9, 0.99]
-        result_list = []
-        for level in compression_levels:
-            threshold = np.percentile(magnitude, 100 * (1 - level))
-            compressed_magnitude = magnitude * (magnitude > threshold)
-            reconstructed_image = perform_inverse_fft(compressed_magnitude, phase, original_shape)
-            print(f"Compression {level * 100:.1f}%: Non-zeros = {np.count_nonzero(compressed_magnitude)}")
-            result_list.append((f"Compressed {int(level * 100)}%", reconstructed_image, "gray"))
-        save_and_display_results(image, result_list, mode=3)
+        save_and_display_compression_results(image, magnitude, phase, original_shape, "results/mode_3")
 
 if __name__ == "__main__":
     main()
