@@ -250,17 +250,17 @@ def plot_runtime_graphs():
         print(f"  Naive DFT -> Mean: {dft_means[idx]:.6f} s, Variance: {dft_variances[idx]:.6e}, Std Dev: {dft_stddevs[idx]:.6e}")
         print(f"  FFT       -> Mean: {fft_means[idx]:.6f} s, Variance: {fft_variances[idx]:.6e}, Std Dev: {fft_stddevs[idx]:.6e}")
 
-    # Plot means with standard deviation error bars
+    # Plot mean runtimes with 97% confidence interval (~2.17 standard deviations)
     plt.figure(figsize=(10, 6))
     plt.errorbar(
-        sizes, dft_means, yerr=dft_stddevs, label="2D-DFT (Naive)", fmt='o-', color='red', capsize=5
+        sizes, dft_means, yerr=[2.17 * std for std in dft_stddevs], label="2D-DFT (Naive)", fmt='o-', color='red', capsize=5
     )
     plt.errorbar(
-        sizes, fft_means, yerr=fft_stddevs, label="2D-FFT (Cooley-Tukey)", fmt='o-', color='blue', capsize=5
+        sizes, fft_means, yerr=[2.17 * std for std in fft_stddevs], label="2D-FFT (Cooley-Tukey)", fmt='o-', color='blue', capsize=5
     )
 
     plt.xticks(sizes) # Set x-ticks to image sizes
-    plt.xlabel("Image Size")
+    plt.xlabel("Image Size (NxN)")
     plt.ylabel(f"Mean Runtime (s) from {num_trials} trials")
     plt.title("Runtime Comparison: Naive DFT vs FFT")
     plt.legend()
