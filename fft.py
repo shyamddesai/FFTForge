@@ -203,33 +203,73 @@ def save_and_display_compression_results(image, magnitude, phase, original_shape
     
 # Compare runtime of Naive DFT and FFT
 def plot_runtime_graphs():
-    sizes = [32, 64, 128, 256]
-    dft_times = []
-    fft_times = []
+    sizes = [2**5, 2**6, 2**7, 2**8]  # Image sizes 32, 64, 128, 256 to test
+    dft_means = []
+    fft_means = []
+    dft_variances = []
+    fft_variances = []
+    dft_stddevs = []
+    fft_stddevs = []
+
+    # Perform multiple runs for statistical analysis
+    num_trials = 10
+    print("Performing runtime analysis with statistical measures...")
 
     for size in sizes:
-        print(f"Processing size: {size}x{size}")
+        print(f"\n======== Processing size: {size}x{size} ========")
         image = np.random.rand(size, size)
 
-        # Naive DFT Runtime
-        start_time = time.time()
-        dft_2d(image)
-        dft_times.append(time.time() - start_time)
+        # Run Naive DFT multiple times
+        dft_run_times = []
+        for trial in range(1, num_trials + 1):
+            start_time = time.time()
+            dft_2d(image)
+            elapsed_time = time.time() - start_time
+            dft_run_times.append(elapsed_time)
+            print(f"  Naive DFT Trial {trial}/{num_trials}: {elapsed_time:.6f} s")
+        dft_means.append(np.mean(dft_run_times))
+        dft_variances.append(np.var(dft_run_times))
+        dft_stddevs.append(np.std(dft_run_times))
 
-        # FFT Runtime
-        start_time = time.time()
-        fft_2d(image)
-        fft_times.append(time.time() - start_time)
+        # Run FFT multiple times
+        fft_run_times = []
+        for trial in range(1, num_trials + 1):
+            start_time = time.time()
+            fft_2d(image)
+            elapsed_time = time.time() - start_time
+            fft_run_times.append(elapsed_time)
+            print(f"  FFT Trial {trial}/{num_trials}: {elapsed_time:.6f} s")
+        fft_means.append(np.mean(fft_run_times))
+        fft_variances.append(np.var(fft_run_times))
+        fft_stddevs.append(np.std(fft_run_times))
 
-    plt.plot(sizes, dft_times, label="2D-DFT (Naive)", marker='o')
-    plt.plot(sizes, fft_times, label="2D-FFT (Cooley-Tukey)", marker='o')
+    # Print means and variances
+    print("\nRuntime Statistics")
+    for idx, size in enumerate(sizes):
+        print(f"Size: {size}x{size}")
+        print(f"  Naive DFT -> Mean: {dft_means[idx]:.6f} s, Variance: {dft_variances[idx]:.6e}, Std Dev: {dft_stddevs[idx]:.6e}")
+        print(f"  FFT       -> Mean: {fft_means[idx]:.6f} s, Variance: {fft_variances[idx]:.6e}, Std Dev: {fft_stddevs[idx]:.6e}")
+
+    # Plot means with standard deviation error bars
+    plt.figure(figsize=(10, 6))
+    plt.errorbar(
+        sizes, dft_means, yerr=dft_stddevs, label="2D-DFT (Naive)", fmt='o-', color='red', capsize=5
+    )
+    plt.errorbar(
+        sizes, fft_means, yerr=fft_stddevs, label="2D-FFT (Cooley-Tukey)", fmt='o-', color='blue', capsize=5
+    )
+
+    plt.xticks(sizes) # Set x-ticks to image sizes
     plt.xlabel("Image Size")
-    plt.ylabel("Runtime (s)")
+    plt.ylabel(f"Mean Runtime (s) from {num_trials} trials")
     plt.title("Runtime Comparison: Naive DFT vs FFT")
     plt.legend()
     plt.grid()
+
+    # Save the plot
     os.makedirs("results/mode_4", exist_ok=True)
     plt.savefig("results/mode_4/runtime_comparison.png")
+    print("\nRuntime comparison plot saved to results/mode_4/runtime_comparison.png")
     plt.show()
 
 # ====================================================================================================
@@ -255,6 +295,7 @@ def main():
             ("Log-scaled FFT Magnitude", np.log(1 + magnitude), "gray")
         ]
         save_and_display_results(image, result_list, mode=1)
+        return
 
     elif args.mode == 2:
         cutoff_frequency = 50
@@ -266,9 +307,11 @@ def main():
             ("Denoised", reconstructed_image, "gray")
         ]
         save_and_display_results(image, result_list, mode=2)
+        return
 
     elif args.mode == 3:
         save_and_display_compression_results(image, magnitude, phase, original_shape, "results/mode_3")
+        return
 
 if __name__ == "__main__":
     main()
