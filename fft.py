@@ -131,7 +131,7 @@ def save_and_display_results(image, result_list, mode):
 
 # Compress the FFT magnitude by retaining a specified fraction of coefficients
 def compress_magnitude(magnitude, compression_level):
-    print(f"Compressing with level: {compression_level * 100}%")
+    print(f"\nCompressing with level: {compression_level * 100}%")
     threshold = np.percentile(magnitude, 100 * compression_level)  # Determine threshold
     compressed_magnitude = magnitude.copy()
     compressed_magnitude[compressed_magnitude < threshold] = 0  # Zero out smaller coefficients
@@ -150,12 +150,13 @@ def save_and_display_compression_results(image, magnitude, phase, original_shape
     save_npz(original_file_path, sparse_matrix)
     original_size = os.path.getsize(original_file_path)
     original_size_str = f"{original_size:,}"  # Add commas to size
+    original_nonzeros = sparse_matrix.nnz  # Number of non-zero elements
 
     # Save original image
     original_image_path = os.path.join(results_dir, "original_image.png")
     plt.imsave(original_image_path, image, cmap="gray")
     print(f"Original image saved: {original_image_path}")
-    print(f"Original matrix size: {original_size_str} bytes")
+    print(f"Original matrix size: {original_size_str} bytes, Non-zero elements: {original_nonzeros}")
 
     # Plot original image
     plt.subplot(2, 3, 1)  # 2 rows, 3 columns for 6 images (original + 5 compression levels)
@@ -174,7 +175,8 @@ def save_and_display_compression_results(image, magnitude, phase, original_shape
         sparse_file_path = os.path.join(results_dir, f"sparse_matrix_{int(level * 100)}.npz")
         save_npz(sparse_file_path, sparse_matrix)
         compressed_size = os.path.getsize(sparse_file_path)
-        compressed_size_str = f"{compressed_size:,}"  # Add commas to size
+        compressed_size_str = f"{compressed_size:,}"
+        compressed_nonzeros = sparse_matrix.nnz  # Number of non-zero elements
 
         # Reconstruct the image using the compressed magnitude
         reconstructed_image = perform_inverse_fft(compressed_magnitude, phase, original_shape)
@@ -183,6 +185,7 @@ def save_and_display_compression_results(image, magnitude, phase, original_shape
         compressed_image_path = os.path.join(results_dir, f"compressed_image_{int(level * 100)}.png")
         plt.imsave(compressed_image_path, reconstructed_image, cmap="gray")
         print(f"Compressed image saved: {compressed_image_path}")
+        print(f"Compressed {level * 100:.1f}%: Matrix Size = {compressed_size_str} bytes, Non-zero elements: {compressed_nonzeros}")
 
         # Plot the reconstructed image
         plt.subplot(2, 3, idx)
