@@ -1,11 +1,12 @@
+from matplotlib.colors import LogNorm
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from scipy.sparse import csr_matrix, save_npz
+from PIL import Image
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.colors import LogNorm
-from PIL import Image
 import argparse
 import os
 import time
-from scipy.sparse import csr_matrix, save_npz
 
 # Load an image and convert it to grayscale
 def load_image(image_path):
@@ -82,16 +83,21 @@ def ifft_2d(image):
     return ifft_result
 
 # Apply a low-pass filter
-def apply_low_pass_filter(magnitude, cutoff_frequency):
-    print(f"Applying low-pass filter with cutoff frequency: {cutoff_frequency}")
-    rows, cols = magnitude.shape
+def apply_low_pass_filter(fft_im, keep_ratio):
+    rows, cols = fft_im.shape
     crow, ccol = rows // 2, cols // 2
-    mask = np.zeros_like(magnitude)
-    for i in range(rows):
-        for j in range(cols):
-            if np.sqrt((i - crow) ** 2 + (j - ccol) ** 2) <= cutoff_frequency:
-                mask[i, j] = 1
-    return magnitude * mask
+
+    # Calculate the keep region
+    r_keep = int(keep_ratio * rows / 2)
+    c_keep = int(keep_ratio * cols / 2)
+
+    # Create a mask for the low-pass filter
+    mask = np.zeros_like(fft_im, dtype=bool)
+    mask[crow - r_keep:crow + r_keep, ccol - c_keep:ccol + c_keep] = True
+
+    # Apply the mask to the FFT (preserving the phase)
+    filtered_fft = fft_im * mask
+    return filtered_fft
 
 # Perform FFT and return magnitude and phase
 def perform_fft(image):
@@ -99,7 +105,15 @@ def perform_fft(image):
     fft_result = fft_2d(padded_image)
     magnitude = np.abs(fft_result)
     phase = np.angle(fft_result)
-    return magnitude, phase, fft_result, padded_image.shape
+    return magnitude, phase, padded_image.shape
+
+# Compute FFT using numpy for comparison
+def numpy_fft2(image):
+    print("Performing FFT using numpy.fft.fft2 for comparison...")
+    fft_result = np.fft.fft2(image)
+    magnitude = np.abs(fft_result)
+    phase = np.angle(fft_result)
+    return fft_result, magnitude, phase
 
 # Perform Inverse FFT using magnitude and phase
 def perform_inverse_fft(magnitude, phase, original_shape):
@@ -107,35 +121,128 @@ def perform_inverse_fft(magnitude, phase, original_shape):
     reconstructed_padded = np.abs(ifft_2d(complex_spectrum))
     return crop_to_original(reconstructed_padded, original_shape)
 
-# Save and display results for different modes
-def save_and_display_results(image, result_list, mode):
+# Save and display results for our FFT method
+def display_fft_magnitude(image, mode):
     results_dir = f"results/mode_{mode}"
     os.makedirs(results_dir, exist_ok=True)
-
     print(f"Saving results in directory: {results_dir}")
 
-    for idx, (title, data, cmap) in enumerate(result_list):
-        file_path = os.path.join(results_dir, f"{title}.png")
-        plt.imsave(file_path, data, cmap=cmap)
-        print(f"Saved: {file_path}")
+    # Compute our implementation of FFT magnitude
+    magnitude, _, _ = perform_fft(image)
+    cropped_magnitude = crop_to_original(magnitude, image.shape) # Crop to original size for better visualization against NumPy
+    log_scaled_magnitude = np.log1p(cropped_magnitude)
 
-    # Display the results
-    plt.figure(figsize=(12, 8))
-    for idx, (title, data, cmap) in enumerate(result_list):
-        plt.subplot(1, len(result_list), idx + 1)
-        plt.title(title)
-        plt.imshow(data, cmap=cmap, norm=LogNorm() if "Magnitude" in title else None)
-        plt.axis("off")
+    # Save the images
+    plt.imsave(os.path.join(results_dir, "original_image.png"), image, cmap="gray")
+    plt.imsave(os.path.join(results_dir, "log_scaled_custom_fft_magnitude.png"), log_scaled_magnitude, cmap="viridis")
+
+    # Plot the original and transformed images
+    plt.figure(figsize=(16, 8))
+    ax1 = plt.subplot(1, 2, 1)
+    ax1.set_title("Original")
+    ax1.imshow(image, cmap="gray")
+    ax1.axis("off")
+
+    ax2 = plt.subplot(1, 2, 2)
+    ax2.set_title("Log-scaled Custom FFT Magnitude")
+    im = ax2.imshow(log_scaled_magnitude, cmap="viridis", norm=LogNorm(vmin=1))
+
+    # Create a colorbar with more ticks and matching width
+    divider = make_axes_locatable(ax2)
+    cax = divider.append_axes("right", size="5%", pad=0.1)  # Adjust size and padding for width
+    cbar = plt.colorbar(im, cax=cax, orientation="vertical")
+    cbar.set_label("Intensity", fontsize=12)
+    cbar.ax.tick_params(labelsize=10)
+    
+    plt.suptitle("Custom FFT Transform Results", fontsize=22)
     plt.tight_layout()
+    plt.savefig(os.path.join(results_dir, "fft_transform_results_custom_fft.png"))
     plt.show()
 
-# Compress the FFT magnitude by retaining a specified fraction of coefficients
-def compress_magnitude(magnitude, compression_level):
-    print(f"\nCompressing with level: {compression_level * 100}%")
-    threshold = np.percentile(magnitude, 100 * compression_level)  # Determine threshold
-    compressed_magnitude = magnitude.copy()
-    compressed_magnitude[compressed_magnitude < threshold] = 0  # Zero out smaller coefficients
-    return compressed_magnitude
+# Save and display results for NumPy FFT method
+def display_numpy_fft_magnitude(image, mode):
+    results_dir = f"results/mode_{mode}"
+    os.makedirs(results_dir, exist_ok=True)
+    print(f"Saving results in directory: {results_dir}")
+
+    # Compute NumPy FFT magnitude
+    _, numpy_magnitude, _ = numpy_fft2(image)
+    log_scaled_magnitude = np.log1p(numpy_magnitude)
+
+    # Save the image
+    plt.imsave(os.path.join(results_dir, "log_scaled_numpy_fft_magnitude.png"), log_scaled_magnitude, cmap="viridis")
+
+    # Plot the original and transformed images
+    plt.figure(figsize=(16, 8))
+    ax1 = plt.subplot(1, 2, 1)
+    ax1.set_title("Original")
+    ax1.imshow(image, cmap="gray")
+    ax1.axis("off")
+
+    ax2 = plt.subplot(1, 2, 2)
+    ax2.set_title("Log-scaled NumPy FFT Magnitude")
+    im = ax2.imshow(log_scaled_magnitude, cmap="viridis", norm=LogNorm(vmin=1))
+ 
+    # Create a colorbar with more ticks and matching width
+    divider = make_axes_locatable(ax2)
+    cax = divider.append_axes("right", size="5%", pad=0.1)  # Adjust size and padding for width
+    cbar = plt.colorbar(im, cax=cax, orientation="vertical")
+    cbar.set_label("Intensity", fontsize=12)
+    cbar.ax.tick_params(labelsize=10)
+
+    plt.suptitle("NumPy FFT Transform Results", fontsize=22)
+    plt.tight_layout()
+    plt.savefig(os.path.join(results_dir, "fft_transform_results_numpy_fft.png"))
+    plt.show()
+
+# Perform denoising and display results
+def display_denoised_fft(image, keep_fraction, mode):
+    results_dir = f"results/mode_{mode}"
+    os.makedirs(results_dir, exist_ok=True)
+    print(f"Saving results in directory: {results_dir}")
+
+    # Perform FFT
+    padded_image = pad_to_power_of_two(image)
+    # fft_transformed = np.fft.fft2(padded_image)
+    fft_transformed = fft_2d(padded_image)
+
+    # Apply thresholding to the FFT-transformed image
+    r, c = fft_transformed.shape
+    fft_filtered = fft_transformed.copy()
+    fft_filtered[int(r * keep_fraction):int(r * (1 - keep_fraction))] = 0
+    fft_filtered[:, int(c * keep_fraction):int(c * (1 - keep_fraction))] = 0
+
+    # Perform inverse FFT
+    # denoised_padded = np.abs(np.fft.ifft2(fft_filtered))
+    denoised_padded = np.abs(ifft_2d(fft_filtered)) 
+    denoised_image = crop_to_original(denoised_padded, image.shape)
+
+    # Normalize and scale the image for visualization
+    denoised_image = (denoised_image - denoised_image.min()) / (denoised_image.max() - denoised_image.min())
+    denoised_image *= 255
+    denoised_image = denoised_image.astype(np.uint8)
+
+    # Save images
+    plt.imsave(os.path.join(results_dir, "original_image.png"), image, cmap="gray")
+    plt.imsave(os.path.join(results_dir, "denoised_image_{:.2f}.png".format(keep_fraction)), denoised_image, cmap="gray")
+
+    # Plot the original and denoised images
+    plt.figure(figsize=(12, 6))
+    ax1 = plt.subplot(1, 2, 1)
+    ax1.set_title("Original")
+    ax1.imshow(image, cmap="gray")
+    ax1.axis("off")
+
+    ax2 = plt.subplot(1, 2, 2)
+    ax2.set_title(f"Denoised (Keep Ratio: {keep_fraction * 100:.1f}%)")
+    ax2.imshow(denoised_image, cmap="gray")
+    ax2.axis("off")
+
+    plt.suptitle(f"Denoising with Keep Ratio: {keep_fraction * 100:.1f}%", fontsize=16)
+    plt.tight_layout(rect=[0, 0, 1, 0.95])
+
+    plt.savefig(os.path.join(results_dir, "denoising_results_{:.2f}.png".format(keep_fraction)))
+    plt.show()
 
 # Save the compressed images and their sparse matrices for various compression levels
 def save_and_display_compression_results(image, magnitude, phase, original_shape, results_dir):
@@ -280,37 +387,27 @@ def main():
     parser.add_argument("-i", "--image", type=str, default="moonlanding.png", help="Path to the input image file.")
     args = parser.parse_args()
 
-    if args.mode == 4:
-        plot_runtime_graphs()
-        return
-
     image = load_image(args.image)
     original_shape = image.shape
-    magnitude, phase, fft_result, padded_shape = perform_fft(image)
 
     if args.mode == 1:
-        reconstructed_image = perform_inverse_fft(magnitude, phase, original_shape)
-        result_list = [
-            ("Original", image, "gray"),
-            ("Log-scaled FFT Magnitude", np.log(1 + magnitude), "gray")
-        ]
-        save_and_display_results(image, result_list, mode=1)
+        display_fft_magnitude(image, mode=1) # Our FFT implementation
+        display_numpy_fft_magnitude(image, mode=1) # Compare with NumPy FFT
         return
 
     elif args.mode == 2:
-        cutoff_frequency = 50
-        filtered_magnitude = apply_low_pass_filter(magnitude, cutoff_frequency)
-        reconstructed_image = perform_inverse_fft(filtered_magnitude, phase, original_shape)
-        print(f"Non-zeros after filtering: {np.count_nonzero(filtered_magnitude)}")
-        result_list = [
-            ("Original", image, "gray"),
-            ("Denoised", reconstructed_image, "gray")
-        ]
-        save_and_display_results(image, result_list, mode=2)
+        thresh_factors = [0.03, 0.05, 0.075, 0.1, 0.2, 0.5, 0.9]
+        for keep_fraction in thresh_factors:
+            display_denoised_fft(image, keep_fraction, mode=2)
         return
 
     elif args.mode == 3:
+        magnitude, phase, _ = perform_fft(image)
         save_and_display_compression_results(image, magnitude, phase, original_shape, "results/mode_3")
+        return
+    
+    elif args.mode == 4:
+        plot_runtime_graphs()
         return
 
 if __name__ == "__main__":
