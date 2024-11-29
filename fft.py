@@ -56,8 +56,8 @@ def fft_1d(signal):
     
     even = fft_1d(signal[::2])  # FFT of even-indexed elements
     odd = fft_1d(signal[1::2])  # FFT of odd-indexed elements
-    T = [np.exp(-2j * np.pi * k / N) * odd[k] for k in range(N // 2)]
-    return [even[k] + T[k] for k in range(N // 2)] + [even[k] - T[k] for k in range(N // 2)]
+    T = np.exp(-2j * np.pi * np.arange(N // 2) / N) * odd
+    return np.concatenate([even + T, even - T])
 
 # Inverse FFT (1D) using the Cooley-Tukey Method
 def ifft_1d(signal):
@@ -69,18 +69,30 @@ def ifft_1d(signal):
 # 2D-FFT Implementation
 def fft_2d(image):
     print("Performing 2D-FFT...")
-    rows, cols = image.shape
-    fft_rows = np.array([fft_1d(row) for row in image])  # Row-wise FFT
-    fft_result = np.array([fft_1d(fft_rows[:, col]) for col in range(cols)]).T  # Column-wise FFT
-    return fft_result
+    rows_transformed = np.array([fft_1d(row) for row in image])
+    cols_transformed = np.array([fft_1d(rows_transformed[:, col]) for col in range(image.shape[1])]).T
+    return cols_transformed
 
 # 2D-Inverse FFT Implementation
 def ifft_2d(image):
     print("Performing 2D-Inverse FFT...")
-    rows, cols = image.shape
-    ifft_rows = np.array([ifft_1d(row) for row in image])  # Row-wise Inverse FFT
-    ifft_result = np.array([ifft_1d(ifft_rows[:, col]) for col in range(cols)]).T  # Column-wise Inverse FFT
-    return ifft_result
+    rows_transformed = np.array([ifft_1d(row) for row in image])
+    cols_transformed = np.array([ifft_1d(rows_transformed[:, col]) for col in range(image.shape[1])]).T
+    return cols_transformed
+
+# Perform FFT and return magnitude and phase
+def perform_fft(image):
+    padded_image = pad_to_power_of_two(image)
+    fft_result = fft_2d(padded_image)
+    magnitude = np.abs(fft_result)
+    phase = np.angle(fft_result)
+    return magnitude, phase
+
+# Perform Inverse FFT using magnitude and phase
+def perform_inverse_fft(magnitude, phase, original_shape):
+    complex_spectrum = magnitude * np.exp(1j * phase)
+    reconstructed_padded = np.abs(ifft_2d(complex_spectrum))
+    return crop_to_original(reconstructed_padded, original_shape)
 
 # Apply a low-pass filter
 def apply_low_pass_filter(fft_im, keep_ratio):
@@ -99,28 +111,7 @@ def apply_low_pass_filter(fft_im, keep_ratio):
     filtered_fft = fft_im * mask
     return filtered_fft
 
-# Perform FFT and return magnitude and phase
-def perform_fft(image):
-    padded_image = pad_to_power_of_two(image)
-    fft_result = fft_2d(padded_image)
-    magnitude = np.abs(fft_result)
-    phase = np.angle(fft_result)
-    return magnitude, phase, padded_image.shape
-
-# Compute FFT using numpy for comparison
-def numpy_fft2(image):
-    print("Performing FFT using numpy.fft.fft2 for comparison...")
-    fft_result = np.fft.fft2(image)
-    magnitude = np.abs(fft_result)
-    phase = np.angle(fft_result)
-    return fft_result, magnitude, phase
-
-# Perform Inverse FFT using magnitude and phase
-def perform_inverse_fft(magnitude, phase, original_shape):
-    complex_spectrum = magnitude * np.exp(1j * phase)
-    reconstructed_padded = np.abs(ifft_2d(complex_spectrum))
-    return crop_to_original(reconstructed_padded, original_shape)
-
+# Compress the magnitude by zeroing out smaller coefficients
 def compress_magnitude(magnitude, compression_level):
     print(f"\nCompressing with level: {compression_level * 100}%")
     threshold = np.percentile(magnitude, 100 * compression_level)  # Determine threshold
@@ -135,7 +126,7 @@ def display_fft_magnitude(image, mode):
     print(f"Saving results in directory: {results_dir}")
 
     # Compute our implementation of FFT magnitude
-    magnitude, _, _ = perform_fft(image)
+    magnitude, _ = perform_fft(image)
     cropped_magnitude = crop_to_original(magnitude, image.shape) # Crop to original size for better visualization against NumPy
     log_scaled_magnitude = np.log1p(cropped_magnitude)
 
@@ -173,7 +164,7 @@ def display_numpy_fft_magnitude(image, mode):
     print(f"Saving results in directory: {results_dir}")
 
     # Compute NumPy FFT magnitude
-    _, numpy_magnitude, _ = numpy_fft2(image)
+    numpy_magnitude = np.abs(np.fft.fft2(image))
     log_scaled_magnitude = np.log1p(numpy_magnitude)
 
     # Save the image
@@ -375,7 +366,7 @@ def plot_runtime_graphs():
 
     plt.xticks(sizes) # Set x-ticks to image sizes
     plt.xlabel("Image Size (NxN)")
-    plt.ylabel(f"Mean Runtime (s) from {num_trials} trials")
+    plt.ylabel(f"Mean Runtime (s) from {num_trials} Trials")
     plt.title("Runtime Comparison: Naive DFT vs FFT")
     plt.legend()
     plt.grid()
@@ -403,13 +394,13 @@ def main():
         return
 
     elif args.mode == 2:
-        thresh_factors = [0.03, 0.05, 0.075, 0.1, 0.2, 0.5, 0.9]
-        for keep_fraction in thresh_factors:
+        threshold_factors = [0.01, 0.05, 0.075, 0.1, 0.2, 0.5, 0.9]
+        for keep_fraction in threshold_factors:
             display_denoised_fft(image, keep_fraction, mode=2)
         return
 
     elif args.mode == 3:
-        magnitude, phase, _ = perform_fft(image)
+        magnitude, phase = perform_fft(image)
         save_and_display_compression_results(image, magnitude, phase, original_shape, "results/mode_3")
         return
     
