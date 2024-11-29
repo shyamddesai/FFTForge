@@ -121,6 +121,13 @@ def perform_inverse_fft(magnitude, phase, original_shape):
     reconstructed_padded = np.abs(ifft_2d(complex_spectrum))
     return crop_to_original(reconstructed_padded, original_shape)
 
+def compress_magnitude(magnitude, compression_level):
+    print(f"\nCompressing with level: {compression_level * 100}%")
+    threshold = np.percentile(magnitude, 100 * compression_level)  # Determine threshold
+    compressed_magnitude = magnitude.copy()
+    compressed_magnitude[compressed_magnitude < threshold] = 0  # Zero out smaller coefficients
+    return compressed_magnitude
+
 # Save and display results for our FFT method
 def display_fft_magnitude(image, mode):
     results_dir = f"results/mode_{mode}"
@@ -246,7 +253,7 @@ def display_denoised_fft(image, keep_fraction, mode):
 
 # Save the compressed images and their sparse matrices for various compression levels
 def save_and_display_compression_results(image, magnitude, phase, original_shape, results_dir):
-    compression_levels = [0.45, 0.96, 0.97, 0.99, 0.999]  # Compression levels to apply
+    compression_levels = [0.45, 0.8, 0.9, 0.97, 0.999]  # Compression levels to apply
     os.makedirs(results_dir, exist_ok=True)
 
     plt.figure(figsize=(15, 10))  # Fixed figure size for clarity
