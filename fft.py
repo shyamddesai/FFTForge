@@ -308,7 +308,7 @@ def save_and_display_compression_results(image, magnitude, phase, original_shape
     
 # Compare runtime of Naive DFT and FFT
 def plot_runtime_graphs():
-    sizes = [2**5, 2**6, 2**7, 2**8]  # Image sizes 32, 64, 128, 256 to test
+    sizes = [2**5, 2**6, 2**7, 2**8, 2**9, 2**10]  # Image sizes 32, 64, 128, 256, 512, 1024 to test
     dft_means = []
     fft_means = []
     dft_variances = []
