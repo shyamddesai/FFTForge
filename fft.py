@@ -94,23 +94,6 @@ def perform_inverse_fft(magnitude, phase, original_shape):
     reconstructed_padded = np.abs(ifft_2d(complex_spectrum))
     return crop_to_original(reconstructed_padded, original_shape)
 
-# Apply a low-pass filter
-def apply_low_pass_filter(fft_im, keep_ratio):
-    rows, cols = fft_im.shape
-    crow, ccol = rows // 2, cols // 2
-
-    # Calculate the keep region
-    r_keep = int(keep_ratio * rows / 2)
-    c_keep = int(keep_ratio * cols / 2)
-
-    # Create a mask for the low-pass filter
-    mask = np.zeros_like(fft_im, dtype=bool)
-    mask[crow - r_keep:crow + r_keep, ccol - c_keep:ccol + c_keep] = True
-
-    # Apply the mask to the FFT (preserving the phase)
-    filtered_fft = fft_im * mask
-    return filtered_fft
-
 # Compress the magnitude by zeroing out smaller coefficients
 def compress_magnitude(magnitude, compression_level):
     print(f"\nCompressing with level: {compression_level * 100}%")
@@ -121,7 +104,7 @@ def compress_magnitude(magnitude, compression_level):
 
 # Save and display results for our FFT method
 def display_fft_magnitude(image, mode):
-    results_dir = f"results/mode_{mode}"
+    results_dir = f"results\mode_{mode}"
     os.makedirs(results_dir, exist_ok=True)
     print(f"Saving results in directory: {results_dir}")
 
@@ -159,7 +142,7 @@ def display_fft_magnitude(image, mode):
 
 # Save and display results for NumPy FFT method
 def display_numpy_fft_magnitude(image, mode):
-    results_dir = f"results/mode_{mode}"
+    results_dir = f"results\mode_{mode}"
     os.makedirs(results_dir, exist_ok=True)
     print(f"Saving results in directory: {results_dir}")
 
@@ -195,7 +178,7 @@ def display_numpy_fft_magnitude(image, mode):
 
 # Perform denoising and display results
 def display_denoised_fft(image, keep_fraction, mode):
-    results_dir = f"results/mode_{mode}"
+    results_dir = f"results\mode_{mode}"
     os.makedirs(results_dir, exist_ok=True)
     print(f"Saving results in directory: {results_dir}")
 
@@ -375,9 +358,9 @@ def plot_runtime_graphs():
     plt.grid()
 
     # Save the plot
-    os.makedirs("results/mode_4", exist_ok=True)
-    plt.savefig("results/mode_4/runtime_comparison.png")
-    print("\nRuntime comparison plot saved to results/mode_4/runtime_comparison.png")
+    os.makedirs("results\mode_4", exist_ok=True)
+    plt.savefig("results\mode_4\runtime_comparison.png")
+    print("\nRuntime comparison plot saved to results\mode_4\runtime_comparison.png")
     plt.show()
 
 # ====================================================================================================
@@ -393,7 +376,7 @@ def main():
 
     if args.mode == 1:
         display_fft_magnitude(image, mode=1) # Our FFT implementation
-        display_numpy_fft_magnitude(image, mode=1) # Compare with NumPy FFT
+        #display_numpy_fft_magnitude(image, mode=1) # Compare with NumPy FFT Only for testing purposes
         return
 
     elif args.mode == 2:
@@ -404,7 +387,7 @@ def main():
 
     elif args.mode == 3:
         magnitude, phase = perform_fft(image)
-        save_and_display_compression_results(image, magnitude, phase, original_shape, "results/mode_3")
+        save_and_display_compression_results(image, magnitude, phase, original_shape, "results\mode_3")
         return
     
     elif args.mode == 4:
