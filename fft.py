@@ -359,8 +359,8 @@ def plot_runtime_graphs():
 
     # Save the plot
     os.makedirs("results\mode_4", exist_ok=True)
-    plt.savefig("results\mode_4\runtime_comparison.png")
-    print("\nRuntime comparison plot saved to results\mode_4\runtime_comparison.png")
+    plt.savefig("results\\mode_4\\runtime_comparison.png")
+    print("\nRuntime comparison plot saved to results\\mode_4\\runtime_comparison.png")
     plt.show()
 
 # ====================================================================================================
