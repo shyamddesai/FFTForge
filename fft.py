@@ -394,7 +394,7 @@ def main():
         return
 
     elif args.mode == 2:
-        threshold_factors = [0.01, 0.05, 0.075, 0.1, 0.2, 0.5, 0.9]
+        threshold_factors = [0.2]
         for keep_fraction in threshold_factors:
             display_denoised_fft(image, keep_fraction, mode=2)
         return
