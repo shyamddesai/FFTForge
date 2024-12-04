@@ -209,6 +209,9 @@ def display_denoised_fft(image, keep_fraction, mode):
     fft_filtered = fft_transformed.copy()
     fft_filtered[int(r * keep_fraction):int(r * (1 - keep_fraction))] = 0
     fft_filtered[:, int(c * keep_fraction):int(c * (1 - keep_fraction))] = 0
+    non_zero = np.count_nonzero(fft_filtered)
+    fraction = non_zero/(fft_filtered.size)
+    print(f"There are {non_zero} non-zeros used. It represents a {fraction} fraction of the original coefficient.")
 
     # Perform inverse FFT
     # denoised_padded = np.abs(np.fft.ifft2(fft_filtered))
